@@ -89,10 +89,7 @@ public class KAtoOntology implements AutoCloseable
             OWLOntologyStorageException {
 
         // create a list of all classes and create an owl node for each
-        //HashMap<Long, Node> classMap = new HashMap<>();
-        //HashMap<Long, OWLClass> OWLclassMap = new HashMap<>();
         for (Triple triple:tripleList){
-
             Relationship rel = triple.getRel();
             Triple.Direction dir = triple.getDirection();
             Node node1;
@@ -107,11 +104,6 @@ public class KAtoOntology implements AutoCloseable
                 node1 = triple.getNode1();
                 node2 = triple.getNode2();
             }
-
-
-
-            //classMap.put(node1.id(), node1);
-            //classMap.put(node2.id(), node2);
 
             //skip the ontology node that KA creates
             if (node1.get("uri").asString().equals(ontologyIRI.toString()) | node2.get("uri").asString().equals(ontologyIRI.toString())){
@@ -132,8 +124,7 @@ public class KAtoOntology implements AutoCloseable
                 }
             }
 
-            // handle synonyms, misspellings, regex and abbreviations
-//            if (dir.equals(Triple.Direction.RIGHT)) {
+            // handle synonyms, misspellings, regex and abbreviations if they are separate nodes
 //                if (rel.hasType("hasSynonym")) {
 //                    addAnnotationToClass("synonym", node1.get("name").asString(), nodeClass2);
 //                    continue; // if it is a synonym, skip adding the relationship to the graph
@@ -150,130 +141,38 @@ public class KAtoOntology implements AutoCloseable
 //                    addAnnotationToClass("subjectiveExpression", node1.get("name").asString(), nodeClass2);
 //                    continue; // if it is a synonym, skip adding the relationship to the graph
 //                }
-//            } else if (dir.equals(Triple.Direction.LEFT)) {
-//                if (rel.hasType("hasSynonym")) {
-//                    addAnnotationToClass("synonym", node2.get("name").asString(), nodeClass1);
-//                    continue; // if it is a synonym, skip adding the relationship to the graph
-//                } else if (rel.hasType("hasMisspelling")) {
-//                    addAnnotationToClass("misspelling", node2.get("name").asString(), nodeClass1);
-//                    continue; // if it is a synonym, skip adding the relationship to the graph
-//                } else if (rel.hasType("hasAbbreviation")) {
-//                    addAnnotationToClass("abbreviation", node2.get("name").asString(), nodeClass1);
-//                    continue; // if it is a synonym, skip adding the relationship to the graph
-//                } else if (rel.hasType("hasRegex")) {
-//                    addAnnotationToClass("regex", node2.get("name").asString(), nodeClass1);
-//                    continue; // if it is a synonym, skip adding the relationship to the graph
-//                } else if (rel.hasType("hasSubjectiveExpression")) {
-//                    addAnnotationToClass("subjectiveExpression", node2.get("name").asString(), nodeClass1);
-//                    continue; // if it is a synonym, skip adding the relationship to the graph
-//                }
-//            }
 
             // add relationships between nodes
             if (rel.type().equals("IS_A")){
-                if (dir.equals(Triple.Direction.LEFT)){
-                    OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, nodeClass1);
-                    managerOWL.applyChange(new AddAxiom(ontology, axiom));
-                } else if (dir.equals(Triple.Direction.RIGHT)){
-                    OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass1, nodeClass2);
-                    managerOWL.applyChange(new AddAxiom(ontology, axiom));
-                }
+                OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, nodeClass1);
+                managerOWL.applyChange(new AddAxiom(ontology, axiom));
             } else {
-
-
-
-
-
-
-                    if (node1.hasLabel("DATATYPE")){
-                        OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData1);
-                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                    } else if (node1.hasLabel("DATA_ONE_OF")){
-                        OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                        String[] dataOneOfStrArr = node1.get("name").asString().split("\\|");
-                        Set<OWLLiteral> literalSet = new HashSet<>();
-                        //OWLDataType litDataType = OWLDatatypeImpl(IRI iri)
-                        for (String litStr : dataOneOfStrArr){
-//                            OWLLiteral lit4 = new OWLLiteralImplString(litStr);
-//                            OWLLiteral lit2 = factoryOWL.getOWLLiteral(litStr);
-                            OWLLiteral lit3 = new OWLLiteralImplPlain(litStr, "en");
-                            OWLLiteral lit = new OWLLiteralImpl(litStr, "en", nodeData1);
-                            literalSet.add(lit);
-                        }
-                        OWLDataOneOf dataOneOf = factoryOWL.getOWLDataOneOf(literalSet);
-                        //OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
-                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                    } else {
-                        OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-                        OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
-                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
+                if (node1.hasLabel("DATATYPE")){
+                    OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
+                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData1);
+                    OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
+                    managerOWL.applyChange(new AddAxiom(ontology, subAx));
+                } else if (node1.hasLabel("DATA_ONE_OF")){
+                    OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
+                    String[] dataOneOfStrArr = node1.get("name").asString().split("\\|");
+                    Set<OWLLiteral> literalSet = new HashSet<>();
+                    for (String litStr : dataOneOfStrArr){
+                        OWLLiteral lit = new OWLLiteralImpl(litStr, "", nodeData1);
+                        literalSet.add(lit);
                     }
-
-                    if (node2.hasLabel("DATATYPE")){
-                        OWLDatatype nodeData2 = factoryOWL.getOWLDatatype(IRI.create(node2.get("uri").asString()));
-                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData2);
-                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass1, hasSome);
-                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                    } else {
-                        OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-                        OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass2);
-                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass1, hasSome);
-                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                    }
-
-//                if (dir.equals(Triple.Direction.LEFT)){
-//                    if (node1.hasLabel("DATATYPE")){
-//                        OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-//                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-//                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData1);
-//                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-//                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-//                    } else if (node1.hasLabel("DATA_ONE_OF")){
-//                        OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-//                        String[] dataOneOfStrArr = node1.get("name").asString().split("\\|");
-//                        Set<OWLLiteral> literalSet = new HashSet<>();
-//                        //OWLDataType litDataType = OWLDatatypeImpl(IRI iri)
-//                        for (String litStr : dataOneOfStrArr){
-////                            OWLLiteral lit4 = new OWLLiteralImplString(litStr);
-////                            OWLLiteral lit2 = factoryOWL.getOWLLiteral(litStr);
-//                            OWLLiteral lit3 = new OWLLiteralImplPlain(litStr, "en");
-//                            OWLLiteral lit = new OWLLiteralImpl(litStr, "en", nodeData1);
-//                            literalSet.add(lit);
-//                        }
-//                        OWLDataOneOf dataOneOf = factoryOWL.getOWLDataOneOf(literalSet);
-//                        //OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-//                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-//                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
-//                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-//                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-//                    } else {
-//                        OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-//                        OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
-//                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-//                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-//                    }
-//                } else if (dir.equals(Triple.Direction.RIGHT)){
-//                    if (node2.hasLabel("DATATYPE")){
-//                        OWLDatatype nodeData2 = factoryOWL.getOWLDatatype(IRI.create(node2.get("uri").asString()));
-//                        OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-//                        OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData2);
-//                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass1, hasSome);
-//                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-//                    } else {
-//                        OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
-//                        OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass2);
-//                        OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass1, hasSome);
-//                        managerOWL.applyChange(new AddAxiom(ontology, subAx));
-//                    }
-//                }
+                    OWLDataOneOf dataOneOf = factoryOWL.getOWLDataOneOf(literalSet);
+                    //OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
+                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
+                    OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
+                    managerOWL.applyChange(new AddAxiom(ontology, subAx));
+                } else {
+                    OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
+                    OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
+                    managerOWL.applyChange(new AddAxiom(ontology, subAx));
+                }
             }
         }
 
