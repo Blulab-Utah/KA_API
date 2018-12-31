@@ -13,6 +13,8 @@ import org.semanticweb.owlapi.reasoner.SimpleConfiguration;
 import org.semanticweb.owlapi.reasoner.structural.StructuralReasonerFactory;
 import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 import uk.ac.manchester.cs.owl.owlapi.OWLDataOneOfImpl;
+import uk.ac.manchester.cs.owl.owlapi.OWLNamedIndividualImpl;
+import uk.ac.manchester.cs.owl.owlapi.OWLObjectPropertyImpl;
 
 import java.io.File;
 import java.io.IOException;
@@ -247,6 +249,48 @@ public class OwlToGraph {
 
                         }
                     }
+                }
+
+                // get all instances and create a node for each
+                if(cls.getIRI().toString().contains("Uncertain_Certainty")){
+                    int xx = 1;
+                }
+                Set<OWLIndividual> individuals = cls.getIndividuals(ontology);
+                for (OWLIndividual individual : individuals){
+                    System.out.println(individual.toString());
+                    OWLNamedIndividualImpl indiv = (OWLNamedIndividualImpl) individual;
+                    Node indNode = getOrCreateNodeWithUniqueFactory(indiv.getIRI().getShortForm(), graphDB);
+                    indNode.setProperty("uri", indiv.getIRI().toString());
+                    //Node indNode = getOrCreateNodeWithUniqueFactory(((((OWLNamedIndividualImpl) indiv).getIRI()).getIRI().getShortForm(), graphDB);
+//                    for (OWLAnnotationAssertionAxiom annot : indiv.getAnnotationAssertionAxioms(ontology)){
+//                        annot.getProperty()
+//                    }
+
+
+                    for (OWLAnnotationAssertionAxiom axiom : indiv.getAnnotationAssertionAxioms(ontology)) {
+                        //System.out.println(axiom.toString());
+                        String relType = axiom.getProperty().getIRI().getShortForm();
+                        OWLLiteral value = (OWLLiteral)axiom.getValue();
+                        String valueStr = value.getLiteral();
+                        indNode.setProperty(relType, valueStr);
+                    }
+
+                    // todo: add the object properties to the classes
+
+                    Map<OWLObjectPropertyExpression, Set<OWLIndividual>> objProps = indiv.getObjectPropertyValues(ontology);
+                    //StringBuilder sb = new StringBuilder();
+                    List<String> valList = new ArrayList<>();
+                    for (OWLObjectPropertyExpression key : objProps.keySet()) {
+                        Set<OWLIndividual> values = objProps.get(key);
+                        for (OWLIndividual val : values) {
+                            //sb.append(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI() + "|");
+                            valList.add(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI());
+                        }
+                    }
+                    indNode.setProperty("objectProperties", String.join("|", valList));
+
+
+                    indNode.createRelationshipTo(newNode, RelationshipType.withName("hasIndividual"));
                 }
             }
 

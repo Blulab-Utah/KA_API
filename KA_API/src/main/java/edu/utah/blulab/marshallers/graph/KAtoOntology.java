@@ -1,5 +1,6 @@
 package edu.utah.blulab.marshallers.graph;
 
+import edu.utah.blulab.marshallers.old.OntologyConstants;
 import org.coode.owlapi.manchesterowlsyntax.ManchesterOWLSyntaxOntologyFormat;
 import org.coode.owlapi.turtle.TurtleOntologyFormat;
 import org.neo4j.driver.internal.value.NodeValue;
@@ -20,10 +21,7 @@ import org.semanticweb.owlapi.io.StreamDocumentTarget;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.io.FileDocumentTarget;
-import uk.ac.manchester.cs.owl.owlapi.OWLDataOneOfImpl;
-import uk.ac.manchester.cs.owl.owlapi.OWLLiteralImpl;
-import uk.ac.manchester.cs.owl.owlapi.OWLLiteralImplPlain;
-import uk.ac.manchester.cs.owl.owlapi.OWLLiteralImplString;
+import uk.ac.manchester.cs.owl.owlapi.*;
 
 import java.util.*;
 import java.io.*;
@@ -88,8 +86,21 @@ public class KAtoOntology implements AutoCloseable
     public void writeToOWL (List<Triple> tripleList) throws OWLOntologyCreationException,
             OWLOntologyStorageException {
 
+        // add imports
+//        String importTerm = "http://blulab.chpc.utah.edu/ontologies/TermMapping.owl";
+//        String importSchema = "http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl";
+//        String importSwrl = "http://swrl.stanford.edu/ontologies/built-ins/3.3/swrlx.owl";
+        OWLImportsDeclaration importDeclaraton = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.TERM_MAPPING_BASE_URI));
+        OWLImportsDeclaration importDeclaraton2 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SCHEMA_BASE_URI));
+        OWLImportsDeclaration importDeclaraton3 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SWIRL_BASE_URI));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaraton));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaraton2));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaraton3));
+
         // create a list of all classes and create an owl node for each
+        int count = 0;
         for (Triple triple:tripleList){
+
             Relationship rel = triple.getRel();
             Triple.Direction dir = triple.getDirection();
             Node node1;
@@ -103,6 +114,20 @@ public class KAtoOntology implements AutoCloseable
             } else {
                 node1 = triple.getNode1();
                 node2 = triple.getNode2();
+            }
+
+            // skip nodes from one of the imported ontologies
+            // todo: figure out how to write only the classes that are not included in the import declarations
+//            if (node1.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI) & node2.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI)){ // if both nodes are from imported ontologies
+//                continue;
+//            } else if (node1.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI) | node2.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI)){ // if only one of the nodes is from imported ontologies
+//                int xxx = 1;
+//            }
+//            if (isImportURI(node1.get("uri").asString()) & isImportURI(node2.get("uri").asString())){
+//                continue;
+//            }
+            if (!node1.get("uri").asString().contains(ontURI) & !node2.get("uri").asString().contains(ontURI)){ // if both nodes are from imported ontologies
+                continue;
             }
 
             //skip the ontology node that KA creates
@@ -122,6 +147,20 @@ public class KAtoOntology implements AutoCloseable
                 for (String val : propertyValue.split("\\|")) {
                     addAnnotationToClass(property, val, nodeClass1);
                 }
+            }
+            for (String property : node2.keys()){
+                if (property.equals("name") | property.equals("uri")){
+                    continue;
+                }
+                String propertyValue = node2.get(property).asString();
+                // parse multiple values from string ('|' delimited)
+                for (String val : propertyValue.split("\\|")) {
+                    addAnnotationToClass(property, val, nodeClass2);
+                }
+            }
+
+            if (node2.get("uri").asString().contains("Kretek")){
+                int ttt = 1;
             }
 
             // handle synonyms, misspellings, regex and abbreviations if they are separate nodes
@@ -143,9 +182,40 @@ public class KAtoOntology implements AutoCloseable
 //                }
 
             // add relationships between nodes
-            if (rel.type().equals("IS_A")){
+            if (rel.type().equals("IS_A")) {
                 OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, nodeClass1);
                 managerOWL.applyChange(new AddAxiom(ontology, axiom));
+            } else if (rel.type().equals("hasIndividual")){
+                // todo: process object properties of individuals
+                OWLIndividual indiv = factoryOWL.getOWLNamedIndividual(IRI.create(node2.get("uri").asString()));
+                OWLClassAssertionAxiom classAssertion = factoryOWL.getOWLClassAssertionAxiom(nodeClass1, indiv);
+                for (String property : node2.keys()){
+                    if (property.equals("name") | property.equals("uri")){
+                        continue;
+                    }
+                    String propertyValue = node2.get(property).asString();
+                    // parse multiple values from string ('|' delimited)
+                    for (String val : propertyValue.split("\\|")) {
+                        if (property.equals("objectProperties")){ // if objectProperties, split key and value, then add to class
+                            String[] keyVal = val.split("::");
+                            String relIRI = keyVal[0];
+                            String indiv2IRI = keyVal[1];
+                            if (count >= 160) {
+                                int ii = 1;
+                            }
+                            //if (count < 165) { // <165    >=160
+                                addObjectPropertyToIndividual(indiv2IRI, relIRI, indiv);
+                                count++;
+                            //}
+                        } else { // for all other properties, add to the original individual
+                            addAnnotationToIndividual(property, val, indiv);
+                        }
+                    }
+                }
+                managerOWL.addAxiom(ontology, classAssertion);
+
+
+
             } else {
                 if (node1.hasLabel("DATATYPE")){
                     OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
@@ -213,11 +283,58 @@ public class KAtoOntology implements AutoCloseable
 
     }
 
+    private boolean isImportURI(String uri){
+        if ( uri.contains(OntologyConstants.SCHEMA_BASE_URI) |
+                uri.contains(OntologyConstants.CONTEXT_BASE_URI) |
+                uri.contains(OntologyConstants.SEMANTIC_TYPE_BASE_URI) |
+                uri.contains(OntologyConstants.THING_URI)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private void addAnnotationToClass(String property, String propertyValue, OWLClass nodeClass){
         OWLAnnotationProperty annoProp = getAnnotationProp(property);
         OWLAnnotation commentAnno = factoryOWL.getOWLAnnotation(annoProp, factoryOWL.getOWLLiteral(propertyValue));
         OWLAxiom ax = factoryOWL.getOWLAnnotationAssertionAxiom(nodeClass.getIRI(), commentAnno);
         managerOWL.applyChange(new AddAxiom(ontology, ax));
+    }
+
+    private void addAnnotationToIndividual(String property, String propertyValue, OWLIndividual individual){
+        OWLNamedIndividualImpl indiv = (OWLNamedIndividualImpl) individual;
+        OWLAnnotationProperty annoProp = getAnnotationProp(property);
+        OWLAnnotation commentAnno = factoryOWL.getOWLAnnotation(annoProp, factoryOWL.getOWLLiteral(propertyValue));
+        OWLAxiom ax = factoryOWL.getOWLAnnotationAssertionAxiom(indiv.getIRI(), commentAnno);
+        managerOWL.applyChange(new AddAxiom(ontology, ax));
+    }
+
+    private void addObjectPropertyToIndividual(String indiv2IRI, String relationshipIRI, OWLIndividual individual){
+        OWLNamedIndividualImpl indiv = (OWLNamedIndividualImpl) individual;
+//        OWLNamedIndividual indiv2 = factoryOWL.getOWLNamedIndividual(IRI.create(indiv2IRI));
+        OWLIndividual indiv2 = factoryOWL.getOWLNamedIndividual(IRI.create(indiv2IRI));
+        OWLObjectProperty relationship = factoryOWL.getOWLObjectProperty(IRI.create(relationshipIRI));
+//        OWLObjectPropertyAssertionAxiom assertion = factoryOWL.getOWLObjectPropertyAssertionAxiom(relationship, indiv, indiv2);
+//        managerOWL.applyChange(new AddAxiom(ontology, assertion));
+
+
+        String base = "http://www.semanticweb.org/ontologies/individualsexample";
+        OWLIndividual matthew = factoryOWL.getOWLNamedIndividual(IRI.create(base + "#matthew"));
+        OWLIndividual peter = factoryOWL.getOWLNamedIndividual(IRI.create(base
+                + "#peter"));
+        // We want to link the subject and object with the hasFather property,
+        // so use the data factory to obtain a reference to this object
+        // property.
+        OWLObjectProperty hasFather = factoryOWL.getOWLObjectProperty(IRI
+                .create(base + "#hasFather"));
+        // Now create the actual assertion (triple), as an object property
+        // assertion axiom matthew --> hasFather --> peter
+        OWLObjectPropertyAssertionAxiom assertion = factoryOWL
+                .getOWLObjectPropertyAssertionAxiom(relationship, indiv, indiv2);
+        // Finally, add the axiom to our ontology and save
+        AddAxiom addAxiomChange = new AddAxiom(ontology, assertion);
+        managerOWL.applyChange(addAxiomChange);
+
     }
 
     private OWLAnnotationProperty getAnnotationProp(String key) {
