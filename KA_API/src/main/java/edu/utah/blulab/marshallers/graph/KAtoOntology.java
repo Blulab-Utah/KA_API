@@ -30,6 +30,11 @@ public class KAtoOntology implements AutoCloseable
     IRI ontologyIRI;
     OWLDataFactory factoryOWL;
 
+    List<Triple> tripleList;
+
+    long startTime;
+    long duration = 0;
+
     public KAtoOntology( String neo4jURL, String user, String password, String ontURI )
     {
         driverNeo4j = GraphDatabase.driver( neo4jURL, AuthTokens.basic( user, password ) );
@@ -46,7 +51,7 @@ public class KAtoOntology implements AutoCloseable
 
     public static void main( String... args ) throws Exception
     {
-        final long startTime = System.currentTimeMillis();
+        final long startTime2 = System.currentTimeMillis();
         String neo4jURL = "bolt://localhost:7687";
         String username =  "neo4j";
         String password = "chuck6";
@@ -69,7 +74,7 @@ public class KAtoOntology implements AutoCloseable
             writer.close();
         }
         long endTime = System.currentTimeMillis();
-        System.out.println("Execution time: " + (endTime - startTime) / 1000 + " sec");
+        System.out.println("Execution time: " + (endTime - startTime2) / 1000 + " sec");
     }
 
     @Override
@@ -362,16 +367,17 @@ public class KAtoOntology implements AutoCloseable
 
             getParentChildTriple(childNode, session, tripleList);
         }
-        System.out.println("Total relationships found: " + tripleList.size());
+        //System.out.println("Total relationships found: " + tripleList.size());
 
         session.close();
         return tripleList;
         //driverNeo4j.close();
     }
 
+    @SuppressWarnings("Duplicates")
     public void getParentChildTriple(Node parentNode, Session session, List<Triple> tripleList) {
 
-        System.out.println("parentNode id: " + parentNode.id());
+        //System.out.println("parentNode id: " + parentNode.id());
 
         // for each relationship direction, run a separate query and add the direction info to the triple
         // RIGHT relationships
@@ -397,7 +403,7 @@ public class KAtoOntology implements AutoCloseable
                 trip.setRel(rel);
                 trip.setDirection(Triple.Direction.RIGHT);
                 //tripleList.add(trip);
-                System.out.println(parentName + " -- " + rel.type() + " --> " + childName);
+                //System.out.println(parentName + " -- " + rel.type() + " --> " + childName);
                 //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
                 count += 1;
                 //System.out.println(trip.toString());
@@ -407,6 +413,7 @@ public class KAtoOntology implements AutoCloseable
                 tripleList.add(trip);
                 //tripListTemp.add(trip);
                 //getParentChildTriple(childNode, session, tripleList);
+                //EndTimeMS();
                 getParentChildTriple(childNode, session, tripleList);
             }
         }
@@ -426,7 +433,7 @@ public class KAtoOntology implements AutoCloseable
                 trip.setNode2(childNode);
                 trip.setRel(rel);
                 trip.setDirection(Triple.Direction.LEFT);
-                System.out.println(parentName + " <-- " + rel.type() + " -- " + childName);
+                //System.out.println(parentName + " <-- " + rel.type() + " -- " + childName);
                 count += 1;
                 //System.out.println(trip.toString());
                 if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
@@ -461,7 +468,7 @@ public class KAtoOntology implements AutoCloseable
 //            }
 //        }
 
-        System.out.println("Total relationships found: " + count);
+        //System.out.println("Total relationships found: " + count);
 
         //session.close();
         //return tripleList;
@@ -516,8 +523,10 @@ public class KAtoOntology implements AutoCloseable
 
     private boolean compareTriples(Triple trip1, List<Triple> tripList){
         boolean match = false;
+
+        boolean matchTemp = false;
         for (Triple trip2 : tripList) {
-            if (trip1.toString().equals(trip2.toString()) | trip1.toString().equals(trip2.toStringReverse())) {
+            if (trip1.isEqual(trip2) | trip1.isEqualReverse(trip2)) {
                 match = true;
                 break;
             }
@@ -648,6 +657,15 @@ public class KAtoOntology implements AutoCloseable
         return 1;
     }
 
+    private void StartTime(){
+        startTime = System.nanoTime();
+    }
+
+    private long EndTimeMS(){
+        long endTime = System.nanoTime();
+        duration = (endTime - startTime) + duration;
+        return duration / 1000000; //to get milliseconds;
+    }
 
     public String getOntURI() {
         return ontURI;

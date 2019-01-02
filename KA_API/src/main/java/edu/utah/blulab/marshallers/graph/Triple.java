@@ -47,6 +47,36 @@ public class Triple {
         this.direction = direction;
     }
 
+    public boolean isEqualReverse(Triple trip2){
+        Direction reverseDirect;
+        if (direction == Direction.RIGHT){
+            reverseDirect = Direction.LEFT;
+        } else if (direction == Direction.LEFT){
+            reverseDirect = Direction.RIGHT;
+        } else {
+            reverseDirect = Direction.BOTH;
+        }
+
+        if (trip2.rel.equals(rel) &
+                trip2.node1.equals(node2) &
+                trip2.node2.equals(node1) &
+                trip2.direction.equals(reverseDirect) ) {
+            return true;
+        }else {
+            return false;
+        }
+    }
+    public boolean isEqual(Triple trip2){
+        if (trip2.rel.equals(rel) &
+            trip2.node1.equals(node1) &
+               trip2.node2.equals(node2) &
+               trip2.direction.equals(direction) ){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public String toString() {
         return "Triple{" +
