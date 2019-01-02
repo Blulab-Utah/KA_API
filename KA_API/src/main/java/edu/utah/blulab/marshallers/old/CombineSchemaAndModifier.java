@@ -19,9 +19,9 @@ public class CombineSchemaAndModifier {
         String name = schemaFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
         File graphFile = new File(schemaFile.getParent() + "/db/" + name);
-        OwlToGraph mainSchema = new OwlToGraph();
+        OwlToGraph_bill mainSchema = new OwlToGraph_bill();
         mainSchema.createNewDB(graphFile);
-        mainSchema.createDBfromOnt(schemaFile);
+        mainSchema.createDBfromOnt(schemaFile, OwlToGraph_bill.NodeTypes.SCHEMA_ONTOLOGY, true);
         mainSchema.labelSchemaOnt();
 
         // create Modifier ontology DB
@@ -29,14 +29,14 @@ public class CombineSchemaAndModifier {
         name = modifierFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
         graphFile = new File(modifierFile.getParent() + "/db/" + name);
-        OwlToGraph mainModifier = new OwlToGraph();
+        OwlToGraph_bill mainModifier = new OwlToGraph_bill();
         mainModifier.createNewDB(graphFile);
-        mainModifier.createDBfromOnt(modifierFile);
+        mainModifier.createDBfromOnt(modifierFile, OwlToGraph_bill.NodeTypes.MODIFIER_ONTOLOGY, true);
         mainModifier.labelModifierOnt();
 
         // create root db
         File graphFileRoot = new File(rootDBName);
-        OwlToGraph mainRoot = new OwlToGraph();
+        OwlToGraph_bill mainRoot = new OwlToGraph_bill();
         mainRoot.createNewDB(graphFileRoot);
 
         // add ontology databases to root DB

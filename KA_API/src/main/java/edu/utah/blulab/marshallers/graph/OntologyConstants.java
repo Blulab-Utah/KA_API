@@ -1,4 +1,4 @@
-package edu.utah.blulab.marshallers.old;
+package edu.utah.blulab.marshallers.graph;
 
 /**
  * predefined set of ontology constants
@@ -9,11 +9,12 @@ public class OntologyConstants {
      */
     public static final String TERM_MAPPING_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/TermMapping.owl";
     public static final String SCHEMA_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl";
-    //public static final String MODIFIER_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/ModifierOntology.owl";
+    public static final String MODIFIER_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/v2/Modifier.owl";
     public static final String SWIRL_BASE_URI = "http://swrl.stanford.edu/ontologies/built-ins/3.3/swrlx.owl";
     public static final String CONTEXT_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/v2/ConText.owl";
     public static final String THING_URI = "http://www.w3.org/2002/07/owl#Thing";
     public static final String SEMANTIC_TYPE_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/v2/SemanticType.owl";
+    public static final String LITERAL_URI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral";
 
 //    public static final String SCHEMA_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/SchemaOntology.owl";
 //    public static final String MODIFIER_BASE_URI = "http://blulab.chpc.utah.edu/ontologies/ModifierOntology.owl";

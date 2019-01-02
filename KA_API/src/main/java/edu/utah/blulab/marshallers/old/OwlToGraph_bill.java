@@ -1,17 +1,12 @@
 package edu.utah.blulab.marshallers.old;
 
+import edu.utah.blulab.marshallers.graph.OntologyConstants;
 import org.neo4j.graphdb.*;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.index.UniqueFactory;
 import org.neo4j.io.fs.FileUtils;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
-import org.semanticweb.owlapi.reasoner.NodeSet;
-import org.semanticweb.owlapi.reasoner.OWLReasoner;
-import org.semanticweb.owlapi.reasoner.OWLReasonerFactory;
-import org.semanticweb.owlapi.reasoner.SimpleConfiguration;
-import org.semanticweb.owlapi.reasoner.structural.StructuralReasonerFactory;
-import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 import uk.ac.manchester.cs.owl.owlapi.OWLDataOneOfImpl;
 import uk.ac.manchester.cs.owl.owlapi.OWLNamedIndividualImpl;
 import uk.ac.manchester.cs.owl.owlapi.OWLObjectPropertyImpl;
@@ -24,24 +19,25 @@ import java.util.*;
 /**
  * Created by Bill on 6/28/2017.
  */
-public class OwlToGraph {
+public class OwlToGraph_bill {
 
     private GraphDatabaseService graphDB = null;
     private String ontologyIRI;
-    private final String schemaURI = "http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl";
+    //private final String schemaURI = "http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl";
+    Map<NodeTypes, Integer> labelCounter = new LinkedHashMap<>();
 
     public static void main(String[] args) throws Exception {
         //File ontFile = new File(args[0]);
-        //File f = new File("/Users/melissa/db/domain");
+        // todo: change this back: comment and uncomment
         File ontFile = new File("C:\\Users\\Bill\\Documents\\2018\\Chapman Lab\\Data\\ontology\\smoking.owl");
         String name = ontFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
 
         File graphFile = new File(ontFile.getParent() + "/db/" + name);
 
-        OwlToGraph main = new OwlToGraph();
+        OwlToGraph_bill main = new OwlToGraph_bill();
         main.createNewDB(graphFile);
-        main.createDBfromOnt(ontFile);
+        main.createDBfromOnt(ontFile, NodeTypes.SCHEMA_ONTOLOGY,true);
         main.labelDomainOntology();
         //main.makeCopy(main.getGraphDB());
     }
@@ -59,7 +55,7 @@ public class OwlToGraph {
         graphDB = dbFactory.newEmbeddedDatabase(graphFile);
     }
 
-    public void createDBfromOnt(File ontFile) throws Exception {
+    public void createDBfromOnt(File ontFile, NodeTypes ontType, boolean includeInstances) throws Exception {
 
 //        File ontFile = new File(args[0]);
 //        //File f = new File("/Users/melissa/db/domain");
@@ -84,21 +80,23 @@ public class OwlToGraph {
         final OWLOntology ontology = manager.loadOntologyFromOntologyDocument(ontFile);
 
         ontologyIRI = ontology.getOntologyID().getOntologyIRI().toString();
+        System.out.println("OntologyIRI set to " + ontologyIRI);
 
         Transaction tx = null;
         try {
             tx = graphDB.beginTx();
         } catch (NullPointerException e) {
-            System.out.println("**** You much create the database with createNewDB first! ****");
+            System.out.println("**** You must create the database with createNewDB first! ****");
             e.printStackTrace();
         }
         try{
             //create Thing node in db
             final Node thingNode = getOrCreateNodeWithUniqueFactory("Thing", NodeTypes.THING, graphDB);
-            thingNode.setProperty("uri", "http://www.w3.org/2002/07/owl#Thing");
+            thingNode.setProperty("uri", OntologyConstants.THING_URI);
 
             // ontology node in db and connect to thing node
-            final Node ontologyNode = getOrCreateNodeWithUniqueFactory(ontologyIRI, NodeTypes.ONTOLOGY, graphDB);
+            //final Node ontologyNode = getOrCreateNodeWithUniqueFactory(ontologyIRI, NodeTypes.ONTOLOGY, graphDB);
+            final Node ontologyNode = getOrCreateNodeWithUniqueFactory(ontologyIRI, ontType == null ? NodeTypes.ONTOLOGY : ontType, graphDB);
             ontologyNode.setProperty("uri", ontologyIRI);
             thingNode.createRelationshipTo(ontologyNode, RelationshipType.withName("IS_A"));
 
@@ -109,11 +107,11 @@ public class OwlToGraph {
 
             System.out.println(ontologyIRI);
             //create node and attributes of each node
-            for(OWLClass cls : classes){
+            for(OWLClass cls : classes) {
                 System.out.println(cls.getIRI());
                 Node newNode = getOrCreateNodeWithUniqueFactory(cls.getIRI().getShortForm(), graphDB);
                 newNode.setProperty("uri", cls.getIRI().toString());
-                //newNode.addLabel(OwlToGraph.NodeTypes.ANCHOR);
+                //newNode.addLabel(OwlToGraph_old.NodeTypes.ANCHOR);
 //                if (cls.getIRI().toString().equals("http://blulab.chpc.utah.edu/ontologies/v2/ConText.owl#Lexicon")){
 //                    int xxx = 1;
 //                }
@@ -122,11 +120,11 @@ public class OwlToGraph {
                 Set<OWLClassExpression> superClasses = cls.getSuperClasses(manager.getOntologies());
 
                 int classCount = 0;
-                if(superClasses.isEmpty()){
+                if (superClasses.isEmpty()) {
                     newNode.createRelationshipTo(thingNode, RelationshipType.withName("IS_A"));
-                }else{
-                    for(OWLClassExpression exp : superClasses){
-                        if(exp.getClassExpressionType().equals(ClassExpressionType.OWL_CLASS)){
+                } else {
+                    for (OWLClassExpression exp : superClasses) {
+                        if (exp.getClassExpressionType().equals(ClassExpressionType.OWL_CLASS)) {
                             //System.out.println(exp.getClassExpressionType());
                             Node parentNode = getOrCreateNodeWithUniqueFactory(exp.asOWLClass().getIRI().getShortForm(),
                                     graphDB);
@@ -138,7 +136,7 @@ public class OwlToGraph {
                         }
                     }
                 }
-                if (!superClasses.isEmpty() & classCount == 0){ // bug fix to fix case where there are superclasses but they are not of type Class
+                if (!superClasses.isEmpty() & classCount == 0) { // bug fix to fix case where there are superclasses but they are not of type Class
                     newNode.createRelationshipTo(thingNode, RelationshipType.withName("IS_A"));
                     //System.out.println("HERE");
                 }
@@ -148,7 +146,7 @@ public class OwlToGraph {
                 Set<OWLAnnotation> annotation = cls.getAnnotations(ontology, label);
                 //get all annotation properties and create properties for each
                 Set<OWLAnnotationAssertionAxiom> annProps = cls.getAnnotationAssertionAxioms(ontology);
-                for(OWLAnnotationAssertionAxiom axiom : annProps) {
+                for (OWLAnnotationAssertionAxiom axiom : annProps) {
                     //System.out.println(axiom.toString());
                     String relType = axiom.getProperty().getIRI().getShortForm();
                     OWLLiteral value = (OWLLiteral) axiom.getValue();
@@ -175,25 +173,16 @@ public class OwlToGraph {
                 //get all axioms on each class and create relationships for each
                 Set<OWLClassExpression> classExpressions = cls.getEquivalentClasses(manager.getOntologies());
                 classExpressions.addAll(cls.getSuperClasses(manager.getOntologies()));
-                for(OWLClassExpression exp : classExpressions){
-                    if(exp.getClassExpressionType().equals(ClassExpressionType.OBJECT_SOME_VALUES_FROM)){
+                for (OWLClassExpression exp : classExpressions) {
+                    if (exp.getClassExpressionType().equals(ClassExpressionType.OBJECT_SOME_VALUES_FROM)) {
                         OWLObjectSomeValuesFrom axiom = (OWLObjectSomeValuesFrom) exp;
                         OWLObjectPropertyExpression objPropertyExpression = axiom.getProperty();
                         String relation = objPropertyExpression.asOWLObjectProperty().getIRI().getShortForm();
                         OWLClassExpression fillerClass = axiom.getFiller();
 
-
-
-                        if (relation.equals("hasTermination")){
-                            //if (relation.equals("isDefaultValue")){
-                                String xx = "HERE";
-                        }
-
-
-
-                        if(fillerClass.getClassExpressionType().equals(ClassExpressionType.OWL_CLASS)){
+                        if (fillerClass.getClassExpressionType().equals(ClassExpressionType.OWL_CLASS)) {
                             String fillerName = fillerClass.asOWLClass().getIRI().getShortForm();
-                            if (fillerName.equals("Annotation")){
+                            if (fillerName.equals("Annotation")) {
                                 int ss = 1;
                             }
                             Node fillerNode = getOrCreateNodeWithUniqueFactory(fillerName, graphDB);
@@ -203,20 +192,13 @@ public class OwlToGraph {
                             propRelation.setProperty("uri",
                                     objPropertyExpression.asOWLObjectProperty().getIRI().toString());
                         }
-                    } else if (exp.getClassExpressionType().equals(ClassExpressionType.DATA_SOME_VALUES_FROM)){
+                    } else if (exp.getClassExpressionType().equals(ClassExpressionType.DATA_SOME_VALUES_FROM)) {
                         OWLDataSomeValuesFrom axiom = (OWLDataSomeValuesFrom) exp;
                         OWLDataPropertyExpression dataPropertyExpression = axiom.getProperty();
                         String relation = dataPropertyExpression.asOWLDataProperty().getIRI().getShortForm();
                         OWLDataRange fillerClass = axiom.getFiller();
 
-
-                        if (relation.equals("isDefaultValue")){
-                            String xx = "HERE";
-
-                        }
-
-
-                        if(fillerClass.getDataRangeType().equals(DataRangeType.DATATYPE)){
+                        if (fillerClass.getDataRangeType().equals(DataRangeType.DATATYPE)) {
                             String fillerName = fillerClass.asOWLDatatype().getIRI().getShortForm();
                             Node fillerNode = getOrCreateNodeWithUniqueFactory(fillerName, graphDB);
                             fillerNode.addLabel(NodeTypes.DATATYPE);
@@ -226,11 +208,11 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
-                        } else if(fillerClass.getDataRangeType().equals(DataRangeType.DATA_ONE_OF)){ // get the data_one_of values such as "true"
+                        } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATA_ONE_OF)) { // get the data_one_of values such as "true"
 
                             StringBuilder sb = new StringBuilder();
                             String prefix = "";
-                            for (OWLLiteral dataoneof : ((OWLDataOneOfImpl) fillerClass).getValues()){
+                            for (OWLLiteral dataoneof : ((OWLDataOneOfImpl) fillerClass).getValues()) {
                                 sb.append(prefix + dataoneof.getLiteral());
                                 prefix = "|";
                             }
@@ -238,59 +220,57 @@ public class OwlToGraph {
                             String fillerName = sb.toString();
                             Node fillerNode = getOrCreateNodeWithUniqueFactory(fillerName, graphDB);
                             fillerNode.addLabel(NodeTypes.DATA_ONE_OF);
-                            // todo: not sure I should hard code the uri here
-                            fillerNode.setProperty("uri", "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral");
+                            fillerNode.setProperty("uri", OntologyConstants.LITERAL_URI);
                             // newNode.createRelationshipTo(fillerNode, RelationshipType.withName(relation));
                             Relationship propRelation = newNode.createRelationshipTo(fillerNode,
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
-
-
                         }
                     }
                 }
+
 
                 // get all instances and create a node for each
-                if(cls.getIRI().toString().contains("Uncertain_Certainty")){
-                    int xx = 1;
-                }
-                Set<OWLIndividual> individuals = cls.getIndividuals(ontology);
-                for (OWLIndividual individual : individuals){
-                    System.out.println(individual.toString());
-                    OWLNamedIndividualImpl indiv = (OWLNamedIndividualImpl) individual;
-                    Node indNode = getOrCreateNodeWithUniqueFactory(indiv.getIRI().getShortForm(), graphDB);
-                    indNode.setProperty("uri", indiv.getIRI().toString());
-                    //Node indNode = getOrCreateNodeWithUniqueFactory(((((OWLNamedIndividualImpl) indiv).getIRI()).getIRI().getShortForm(), graphDB);
-//                    for (OWLAnnotationAssertionAxiom annot : indiv.getAnnotationAssertionAxioms(ontology)){
-//                        annot.getProperty()
-//                    }
-
-
-                    for (OWLAnnotationAssertionAxiom axiom : indiv.getAnnotationAssertionAxioms(ontology)) {
-                        //System.out.println(axiom.toString());
-                        String relType = axiom.getProperty().getIRI().getShortForm();
-                        OWLLiteral value = (OWLLiteral)axiom.getValue();
-                        String valueStr = value.getLiteral();
-                        indNode.setProperty(relType, valueStr);
+                if (includeInstances){
+                    if (cls.getIRI().toString().contains("Uncertain_Certainty")) {
+                        int xx = 1;
                     }
+                    Set<OWLIndividual> individuals = cls.getIndividuals(ontology);
+                    for (OWLIndividual individual : individuals) {
+                        System.out.println(individual.toString());
+                        OWLNamedIndividualImpl indiv = (OWLNamedIndividualImpl) individual;
+                        Node indNode = getOrCreateNodeWithUniqueFactory(indiv.getIRI().getShortForm(), graphDB);
+                        indNode.setProperty("uri", indiv.getIRI().toString());
+                        //Node indNode = getOrCreateNodeWithUniqueFactory(((((OWLNamedIndividualImpl) indiv).getIRI()).getIRI().getShortForm(), graphDB);
+    //                    for (OWLAnnotationAssertionAxiom annot : indiv.getAnnotationAssertionAxioms(ontology)){
+    //                        annot.getProperty()
+    //                    }
 
-                    // todo: add the object properties to the classes
 
-                    Map<OWLObjectPropertyExpression, Set<OWLIndividual>> objProps = indiv.getObjectPropertyValues(ontology);
-                    //StringBuilder sb = new StringBuilder();
-                    List<String> valList = new ArrayList<>();
-                    for (OWLObjectPropertyExpression key : objProps.keySet()) {
-                        Set<OWLIndividual> values = objProps.get(key);
-                        for (OWLIndividual val : values) {
-                            //sb.append(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI() + "|");
-                            valList.add(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI());
+                        for (OWLAnnotationAssertionAxiom axiom : indiv.getAnnotationAssertionAxioms(ontology)) {
+                            //System.out.println(axiom.toString());
+                            String relType = axiom.getProperty().getIRI().getShortForm();
+                            OWLLiteral value = (OWLLiteral) axiom.getValue();
+                            String valueStr = value.getLiteral();
+                                            indNode.setProperty(relType, valueStr);
                         }
+
+                        Map<OWLObjectPropertyExpression, Set<OWLIndividual>> objProps = indiv.getObjectPropertyValues(ontology);
+                        //StringBuilder sb = new StringBuilder();
+                        List<String> valList = new ArrayList<>();
+                        for (OWLObjectPropertyExpression key : objProps.keySet()) {
+                            Set<OWLIndividual> values = objProps.get(key);
+                            for (OWLIndividual val : values) {
+                                //sb.append(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI() + "|");
+                                valList.add(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI());
+                            }
+                        }
+                        indNode.setProperty("objectProperties", String.join("|", valList));
+
+
+                        indNode.createRelationshipTo(newNode, RelationshipType.withName("hasIndividual"));
                     }
-                    indNode.setProperty("objectProperties", String.join("|", valList));
-
-
-                    indNode.createRelationshipTo(newNode, RelationshipType.withName("hasIndividual"));
                 }
             }
 
@@ -311,6 +291,12 @@ public class OwlToGraph {
             tx.close();
         }
 
+    }
+
+    static void printLabels(Map<NodeTypes, Integer> labelCtr) {
+        for (NodeTypes type : labelCtr.keySet()) {
+            System.out.println(type + " : " + labelCtr.get(type));
+        }
     }
 
     public void labelDomainOntology(){
@@ -688,7 +674,7 @@ public class OwlToGraph {
         // todo: make more robust to SemanticCategory named "SemanticCategory"
         Result result = graphDB.execute(
                 "MATCH (nd {name:'Event'})<-[:IS_A*..15]-(child)" +
-                        "WHERE child.uri =~ '.*" + schemaURI + ".*' " +
+                        "WHERE child.uri =~ '.*" + OntologyConstants.SCHEMA_BASE_URI + ".*' " +
                         "MATCH (child) " +
                         "WHERE NOT (()-[:IS_A]->(child)) " + // match node that does not have any children
                         "RETURN child");
@@ -704,9 +690,9 @@ public class OwlToGraph {
         // match notes that have children that are not from the Schema ontology
         result = graphDB.execute(
                 "MATCH (nd {name:'Event'})<-[:IS_A*..15]-(child) " +
-                        "WHERE child.uri =~ '.*" + schemaURI + ".*' " +
+                        "WHERE child.uri =~ '.*" + OntologyConstants.SCHEMA_BASE_URI + ".*' " +
                         "MATCH ((newchild)-[:IS_A]->(child)) " +
-                        "WHERE NOT newchild.uri =~ '.*" + schemaURI + ".*' " +
+                        "WHERE NOT newchild.uri =~ '.*" + OntologyConstants.SCHEMA_BASE_URI + ".*' " +
                         "RETURN child");
 
         ResourceIterator<Node> iter2 = result.columnAs("child");
