@@ -93,12 +93,12 @@ public class KAtoOntology implements AutoCloseable
     public String createOWLfromTriples (List<Triple> tripleList) throws OWLOntologyStorageException {
 
         // add imports
-        OWLImportsDeclaration importDeclaraton = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.TERM_MAPPING_BASE_URI));
-        OWLImportsDeclaration importDeclaraton2 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SCHEMA_BASE_URI));
-        OWLImportsDeclaration importDeclaraton3 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SWIRL_BASE_URI));
-        managerOWL.applyChange(new AddImport(ontology, importDeclaraton));
-        managerOWL.applyChange(new AddImport(ontology, importDeclaraton2));
-        managerOWL.applyChange(new AddImport(ontology, importDeclaraton3));
+        OWLImportsDeclaration importDeclaration = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.TERM_MAPPING_BASE_URI));
+        OWLImportsDeclaration importDeclaration2 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SCHEMA_BASE_URI));
+        OWLImportsDeclaration importDeclaration3 = factoryOWL.getOWLImportsDeclaration(IRI.create(OntologyConstants.SWIRL_BASE_URI));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaration));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaration2));
+        managerOWL.applyChange(new AddImport(ontology, importDeclaration3));
 
         // create a list of all classes and create an owl node for each
         int count = 0;
@@ -148,7 +148,7 @@ public class KAtoOntology implements AutoCloseable
                 String propertyValue = node1.get(property).asString();
                 // parse multiple values from string ('|' delimited)
                 for (String val : propertyValue.split("\\|")) {
-                    addAnnotationToClass(property, val, nodeClass1);
+                     addAnnotationToClass(property, val, nodeClass1);
                 }
             }
             for (String property : node2.keys()){
@@ -217,7 +217,8 @@ public class KAtoOntology implements AutoCloseable
             } else {
                 if (node1.hasLabel("DATATYPE")){
                     OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    //OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(rel.get("uri").asString()));
                     OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData1);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
@@ -231,12 +232,21 @@ public class KAtoOntology implements AutoCloseable
                     }
                     OWLDataOneOf dataOneOf = factoryOWL.getOWLDataOneOf(literalSet);
                     //OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    //OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(rel.get("uri").asString()));
                     OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
+                } else if (node2.hasLabel("VARIABLE") & node2.get("uri").asString().contains(ontURI)) { // for the variable nodes the hasSome properties as Equivalent, not SubClass of
+                    //OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
+                    OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
+                    //OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
+                    OWLEquivalentClassesAxiom eqAx = factoryOWL.getOWLEquivalentClassesAxiom(nodeClass2, hasSome);
+                    managerOWL.applyChange(new AddAxiom(ontology, eqAx));
                 } else {
-                    OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    //OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
+                    OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
                     OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
@@ -252,6 +262,147 @@ public class KAtoOntology implements AutoCloseable
         managerOWL.saveOntology(ontology, new OWLXMLOntologyFormat(), stream);
         //System.out.println(stream.toString());
         return stream.toString();
+    }
+
+    public List<Triple> getParentChildTripleAll() throws Exception{
+        Session session = driverNeo4j.session();
+
+        StatementResult result =
+                session.run( "MATCH (n {name:'" + ontURI  + "'})<-[rel*1]-(child) RETURN n, rel, child");
+
+        List<Triple> tripleList = new ArrayList<>();
+        int count = 0;
+        while (result.hasNext()) {
+            Record record = result.next();
+            //Value nv = record.get("child");
+            Node childNode = record.get("child").asNode();
+            Node parentNode = record.get("n").asNode();
+            //System.out.println(record.get("child").get("name").asString() );
+
+            String parentName = (String)parentNode.asMap().get("name"); //((InternalNode) parentNode
+            String childName = (String)childNode.asMap().get("name");
+            for (int i = 0; i < record.get("rel").size(); i++) {
+                Relationship rel = record.get("rel").get(i).asRelationship();
+                Triple trip = new Triple();
+                trip.setNode1(parentNode);
+                trip.setNode2(childNode);
+                trip.setRel(rel);
+                trip.setDirection(Triple.Direction.LEFT);
+                tripleList.add(trip);
+                System.out.println(parentName + " -- " + rel.type() + " -- " + childName);
+                //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
+                count += 1;
+                //System.out.println(trip.toString());
+            }
+
+            getParentChildTriple(childNode, session, tripleList);
+        }
+        //System.out.println("Total relationships found: " + tripleList.size());
+
+        session.close();
+        return tripleList;
+        //driverNeo4j.close();
+    }
+
+    @SuppressWarnings("Duplicates")
+    public void getParentChildTriple(Node parentNode, Session session, List<Triple> tripleList) {
+
+        //System.out.println("parentNode id: " + parentNode.id());
+
+        // for each relationship direction, run a separate query and add the direction info to the triple
+        // RIGHT relationships
+        StatementResult result =
+                session.run( "MATCH (n)-[rel*1]->(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
+
+        int count = 0;
+        while (result.hasNext()) {
+
+            Record record = result.next();
+            //Value nv = record.get("child");
+            Node childNode = record.get("child").asNode();
+            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
+            //System.out.println(record.get("child").get("name").asString() );
+
+            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
+            String childName = (String)childNode.asMap().get("name");
+            for (int i = 0; i < record.get("rel").size(); i++) {
+                Relationship rel = record.get("rel").get(i).asRelationship();
+                Triple trip = new Triple();
+                trip.setNode1(parentNode2);
+                trip.setNode2(childNode);
+                trip.setRel(rel);
+                trip.setDirection(Triple.Direction.RIGHT);
+                //tripleList.add(trip);
+                System.out.println(parentName + " -- " + rel.type() + " --> " + childName);
+                //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
+                count += 1;
+                //System.out.println(trip.toString());
+
+                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
+
+                tripleList.add(trip);
+                //tripListTemp.add(trip);
+                //getParentChildTriple(childNode, session, tripleList);
+                //EndTimeMS();
+                getParentChildTriple(childNode, session, tripleList);
+            }
+        }
+
+        // LEFT relationships
+        result = session.run( "MATCH (n)<-[rel*1]-(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
+        while (result.hasNext()) {
+            Record record = result.next();
+            Node childNode = record.get("child").asNode();
+            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
+            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
+            String childName = (String)childNode.asMap().get("name");
+            for (int i = 0; i < record.get("rel").size(); i++) {
+                Relationship rel = record.get("rel").get(i).asRelationship();
+                Triple trip = new Triple();
+                trip.setNode1(parentNode2);
+                trip.setNode2(childNode);
+                trip.setRel(rel);
+                trip.setDirection(Triple.Direction.LEFT);
+                System.out.println(parentName + " <-- " + rel.type() + " -- " + childName);
+                count += 1;
+                //System.out.println(trip.toString());
+                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
+                //tripListTemp.add(trip);
+                tripleList.add(trip);
+                getParentChildTriple(childNode, session, tripleList);
+            }
+        }
+
+//        // BOTH relationships
+//        result = session.run( "MATCH (n)<-[rel*1]->(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
+//        while (result.hasNext()) {
+//            Record record = result.next();
+//            Node childNode = record.get("child").asNode();
+//            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
+//            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
+//            String childName = (String)childNode.asMap().get("name");
+//            for (int i = 0; i < record.get("rel").size(); i++) {
+//                Relationship rel = record.get("rel").get(i).asRelationship();
+//                Triple trip = new Triple();
+//                trip.setNode1(parentNode2);
+//                trip.setNode2(childNode);
+//                trip.setRel(rel);
+//                trip.setDirection(Triple.Direction.BOTH);
+//                System.out.println(parentName + " <-- " + rel.type() + " --> " + childName);
+//                count += 1;
+//                System.out.println(trip.toString());
+//                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
+//                tripleList.add(trip);
+//                //tripListTemp.add(trip);
+//                getParentChildTriple(childNode, session, tripleList);
+//            }
+//        }
+
+        //System.out.println("Total relationships found: " + count);
+
+        //session.close();
+        //return tripleList;
+        //driverNeo4j.close();
     }
 
     private boolean isImportURI(String uri){
@@ -334,147 +485,6 @@ public class KAtoOntology implements AutoCloseable
         }
     }
 
-    public List<Triple> getParentChildTripleAll() throws Exception{
-        Session session = driverNeo4j.session();
-
-        StatementResult result =
-                session.run( "MATCH (n {name:'" + ontURI  + "'})<-[rel*1]-(child) RETURN n, rel, child");
-
-        List<Triple> tripleList = new ArrayList<>();
-        int count = 0;
-        while (result.hasNext()) {
-            Record record = result.next();
-            //Value nv = record.get("child");
-            Node childNode = record.get("child").asNode();
-            Node parentNode = record.get("n").asNode();
-            //System.out.println(record.get("child").get("name").asString() );
-
-            String parentName = (String)parentNode.asMap().get("name"); //((InternalNode) parentNode
-            String childName = (String)childNode.asMap().get("name");
-            for (int i = 0; i < record.get("rel").size(); i++) {
-                Relationship rel = record.get("rel").get(i).asRelationship();
-                Triple trip = new Triple();
-                trip.setNode1(parentNode);
-                trip.setNode2(childNode);
-                trip.setRel(rel);
-                trip.setDirection(Triple.Direction.LEFT);
-                tripleList.add(trip);
-                System.out.println(parentName + " -- " + rel.type() + " -- " + childName);
-                //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
-                count += 1;
-                //System.out.println(trip.toString());
-            }
-
-            getParentChildTriple(childNode, session, tripleList);
-        }
-        //System.out.println("Total relationships found: " + tripleList.size());
-
-        session.close();
-        return tripleList;
-        //driverNeo4j.close();
-    }
-
-    @SuppressWarnings("Duplicates")
-    public void getParentChildTriple(Node parentNode, Session session, List<Triple> tripleList) {
-
-        //System.out.println("parentNode id: " + parentNode.id());
-
-        // for each relationship direction, run a separate query and add the direction info to the triple
-        // RIGHT relationships
-        StatementResult result =
-                session.run( "MATCH (n)-[rel*1]->(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
-
-        int count = 0;
-        while (result.hasNext()) {
-
-            Record record = result.next();
-            //Value nv = record.get("child");
-            Node childNode = record.get("child").asNode();
-            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
-            //System.out.println(record.get("child").get("name").asString() );
-
-            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
-            String childName = (String)childNode.asMap().get("name");
-            for (int i = 0; i < record.get("rel").size(); i++) {
-                Relationship rel = record.get("rel").get(i).asRelationship();
-                Triple trip = new Triple();
-                trip.setNode1(parentNode2);
-                trip.setNode2(childNode);
-                trip.setRel(rel);
-                trip.setDirection(Triple.Direction.RIGHT);
-                //tripleList.add(trip);
-                //System.out.println(parentName + " -- " + rel.type() + " --> " + childName);
-                //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
-                count += 1;
-                //System.out.println(trip.toString());
-
-                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
-
-                tripleList.add(trip);
-                //tripListTemp.add(trip);
-                //getParentChildTriple(childNode, session, tripleList);
-                //EndTimeMS();
-                getParentChildTriple(childNode, session, tripleList);
-            }
-        }
-
-        // LEFT relationships
-        result = session.run( "MATCH (n)<-[rel*1]-(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
-        while (result.hasNext()) {
-            Record record = result.next();
-            Node childNode = record.get("child").asNode();
-            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
-            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
-            String childName = (String)childNode.asMap().get("name");
-            for (int i = 0; i < record.get("rel").size(); i++) {
-                Relationship rel = record.get("rel").get(i).asRelationship();
-                Triple trip = new Triple();
-                trip.setNode1(parentNode2);
-                trip.setNode2(childNode);
-                trip.setRel(rel);
-                trip.setDirection(Triple.Direction.LEFT);
-                //System.out.println(parentName + " <-- " + rel.type() + " -- " + childName);
-                count += 1;
-                //System.out.println(trip.toString());
-                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
-                //tripListTemp.add(trip);
-                tripleList.add(trip);
-                getParentChildTriple(childNode, session, tripleList);
-            }
-        }
-
-//        // BOTH relationships
-//        result = session.run( "MATCH (n)<-[rel*1]->(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
-//        while (result.hasNext()) {
-//            Record record = result.next();
-//            Node childNode = record.get("child").asNode();
-//            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
-//            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
-//            String childName = (String)childNode.asMap().get("name");
-//            for (int i = 0; i < record.get("rel").size(); i++) {
-//                Relationship rel = record.get("rel").get(i).asRelationship();
-//                Triple trip = new Triple();
-//                trip.setNode1(parentNode2);
-//                trip.setNode2(childNode);
-//                trip.setRel(rel);
-//                trip.setDirection(Triple.Direction.BOTH);
-//                System.out.println(parentName + " <-- " + rel.type() + " --> " + childName);
-//                count += 1;
-//                System.out.println(trip.toString());
-//                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
-//                tripleList.add(trip);
-//                //tripListTemp.add(trip);
-//                getParentChildTriple(childNode, session, tripleList);
-//            }
-//        }
-
-        //System.out.println("Total relationships found: " + count);
-
-        //session.close();
-        //return tripleList;
-        //driverNeo4j.close();
-    }
-
     public void getParentChildTriple_old(Node parentNode, Session session, List<Triple> tripleList) throws Exception{
         int x = 11;
         //Session session = driverNeo4j.session();
@@ -526,6 +536,7 @@ public class KAtoOntology implements AutoCloseable
 
         boolean matchTemp = false;
         for (Triple trip2 : tripList) {
+//            if (trip1.toString().equals(trip2.toString()) | trip1.toString().equals(trip2.toStringReverse())) {
             if (trip1.isEqual(trip2) | trip1.isEqualReverse(trip2)) {
                 match = true;
                 break;

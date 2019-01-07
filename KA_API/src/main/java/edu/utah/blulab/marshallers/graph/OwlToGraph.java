@@ -6,9 +6,7 @@ import org.neo4j.graphdb.index.UniqueFactory;
 import org.neo4j.io.fs.FileUtils;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
-import uk.ac.manchester.cs.owl.owlapi.OWLDataOneOfImpl;
-import uk.ac.manchester.cs.owl.owlapi.OWLNamedIndividualImpl;
-import uk.ac.manchester.cs.owl.owlapi.OWLObjectPropertyImpl;
+import uk.ac.manchester.cs.owl.owlapi.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +27,8 @@ public class OwlToGraph {
 
         // todo:comment this back out
         //File ontFile = new File(args[0]);
-        File ontFile = new File("C:\\Users\\Bill\\Documents\\2018\\Chapman Lab\\Data\\ontology\\smoking.owl");
+        File ontFile = new File("C:\\Users\\Bill\\Documents\\2018\\Chapman Lab\\Data\\ontology\\smoking_sub.owl");
+        //File ontFile = new File("C:\\Users\\Bill\\Desktop\\smoking_sub.owl");
 
         String name = ontFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
@@ -114,9 +113,11 @@ public class OwlToGraph {
                 Node newNode = getOrCreateNodeWithUniqueFactory(cls.getIRI().getShortForm(), graphDB);
                 newNode.setProperty("uri", cls.getIRI().toString());
                 //newNode.addLabel(OwlToGraph_old.NodeTypes.ANCHOR);
-//                if (cls.getIRI().toString().equals("http://blulab.chpc.utah.edu/ontologies/v2/ConText.owl#Lexicon")){
-//                    int xxx = 1;
-//                }
+
+
+                if (cls.getIRI().toString().equals("http://blulab.chpc.utah.edu/ontologies/examples/smoking.owl#Duration_gte_12_months")){
+                    int xxx = 1;
+                }
 
                 //get superclasses to link to or else link to owl:Thing
                 Set<OWLClassExpression> superClasses = cls.getSuperClasses(manager.getOntologies());
@@ -169,8 +170,8 @@ public class OwlToGraph {
 //                    }
                 }
 
-                //get all datatype expressions
-                Set<OWLDatatype> datatypes = cls.getDatatypesInSignature();
+//                //get all datatype expressions
+//                Set<OWLDatatype> datatypes = cls.getDatatypesInSignature();
 
                 //get all axioms on each class and create relationships for each
                 Set<OWLClassExpression> classExpressions = cls.getEquivalentClasses(manager.getOntologies());
@@ -193,6 +194,15 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     objPropertyExpression.asOWLObjectProperty().getIRI().toString());
+                        } else if (fillerClass.getClassExpressionType().equals(ClassExpressionType.OBJECT_UNION_OF)){ // if there are a list of classes for a hasSome expression
+                            for (OWLClass clsFromList : fillerClass.getClassesInSignature()){
+                                String fillerName = clsFromList.asOWLClass().getIRI().getShortForm();
+                                Node fillerNode = getOrCreateNodeWithUniqueFactory(fillerName, graphDB);
+                                Relationship propRelation = newNode.createRelationshipTo(fillerNode,
+                                        RelationshipType.withName(relation));
+                                propRelation.setProperty("uri",
+                                        objPropertyExpression.asOWLObjectProperty().getIRI().toString());
+                            }
                         }
                     } else if (exp.getClassExpressionType().equals(ClassExpressionType.DATA_SOME_VALUES_FROM)) {
                         OWLDataSomeValuesFrom axiom = (OWLDataSomeValuesFrom) exp;
@@ -210,15 +220,14 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
-                        } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATA_ONE_OF)) { // get the data_one_of values such as "true"
 
+                        } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATA_ONE_OF)) { // get the data_one_of values such as "true"
                             StringBuilder sb = new StringBuilder();
                             String prefix = "";
                             for (OWLLiteral dataoneof : ((OWLDataOneOfImpl) fillerClass).getValues()) {
                                 sb.append(prefix + dataoneof.getLiteral());
                                 prefix = "|";
                             }
-
                             String fillerName = sb.toString();
                             Node fillerNode = getOrCreateNodeWithUniqueFactory(fillerName, graphDB);
                             fillerNode.addLabel(NodeTypes.DATA_ONE_OF);
@@ -228,6 +237,19 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
+
+                        } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATATYPE_RESTRICTION)) { // add datatype restriction as properties of the new node
+                            StringBuilder sb = new StringBuilder();
+                            String prefix = "";
+                            for (OWLFacetRestriction facet : ((OWLDatatypeRestrictionImpl) fillerClass).getFacetRestrictions()) {
+                                String symbol = ((OWLFacetRestrictionImpl) facet).toString();
+                                sb.append(prefix + ((OWLFacetRestrictionImpl) facet).toString());
+                                prefix = "|";
+                            }
+                            newNode.setProperty(relation, sb.toString());
+
+                        } else {
+                            System.out.println ("Could not handle datatype: " + fillerClass.getDataRangeType() + "  for node: " + cls.getIRI());
                         }
                     }
                 }
@@ -316,11 +338,12 @@ public class OwlToGraph {
             addQualifierLabels();
             addSemanticModifierLabels();
             //todo This causes double labeling.
-            //            addSemanticCategoryLabels();
+                        //addSemanticCategoryLabels();
+            addCategoryLables();
             addAnnotationTypeLabels();
             addDocumentsSectionLabels();
             labelUnlabeled();
-            fixRelations();
+            //fixRelations();
             makeAllOwlEntry();
             removeSelfReferences();
             tx.success();
@@ -582,7 +605,8 @@ public class OwlToGraph {
         ANNOTATION_TYPE,
         PSEUDO_ANCHOR,
         DATATYPE,
-        DATA_ONE_OF;
+        DATA_ONE_OF,
+        CATEGORY;
     }
 
     private void setLabels(ResourceIterator<Node> iter, NodeTypes type) {
@@ -713,6 +737,23 @@ public class OwlToGraph {
         ResourceIterator<Node> iter2 = result.columnAs("child");
         this.setLabels(iter2, NodeTypes.SEMANTIC_CATEGORY);
 
+    }
+
+    private void addCategoryLables() {
+        Set<String> categoryURIs = new HashSet<>();
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#Encounter");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#Procedure");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#Observation");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#MedicationStatement");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#Condition");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#AllergyIntolerance");
+        categoryURIs.add("http://blulab.chpc.utah.edu/ontologies/v2/Schema.owl#Patient");
+
+        for (String catURI : categoryURIs){
+            Result result = graphDB.execute("MATCH (n) WHERE n.uri=\"" + catURI + "\" RETURN n");
+            ResourceIterator<Node> iter = result.columnAs("n");
+            this.setLabels(iter, NodeTypes.CATEGORY);
+        }
     }
 
     private void labelUnlabeled() {

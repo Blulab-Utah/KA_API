@@ -1,7 +1,5 @@
 package edu.utah.blulab.marshallers.graph;
 
-import edu.utah.blulab.marshallers.old.OwlToGraph_bill;
-
 import java.io.File;
 
 /**
@@ -22,9 +20,9 @@ public class CreateKADatabase {
         String name = ontFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
         File graphFile = new File(ontFile.getParent() + "/db/" + name);
-        OwlToGraph_bill mainOnt1 = new OwlToGraph_bill();
+        OwlToGraph mainOnt1 = new OwlToGraph();
         mainOnt1.createNewDB(graphFile);
-        mainOnt1.createDBfromOnt(ontFile, OwlToGraph_bill.NodeTypes.ONTOLOGY, true);
+        mainOnt1.createDBfromOnt(ontFile, OwlToGraph.NodeTypes.ONTOLOGY, true);
         mainOnt1.labelDomainOntology();
 
         // create domain ontology 2 DB
@@ -32,9 +30,9 @@ public class CreateKADatabase {
         String name2 = ontFile2.getName();
         name2 = name2.substring(0, name2.lastIndexOf("."));
         graphFile = new File(ontFile2.getParent() + "/db/" + name2);
-        OwlToGraph_bill mainOnt2 = new OwlToGraph_bill();
+        OwlToGraph mainOnt2 = new OwlToGraph();
         mainOnt2.createNewDB(graphFile);
-        mainOnt2.createDBfromOnt(ontFile2, OwlToGraph_bill.NodeTypes.ONTOLOGY, true);
+        mainOnt2.createDBfromOnt(ontFile2, OwlToGraph.NodeTypes.ONTOLOGY, true);
         mainOnt2.labelDomainOntology();
 
         // create Schema ontology DB
@@ -42,9 +40,9 @@ public class CreateKADatabase {
         name = schemaFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
         graphFile = new File(schemaFile.getParent() + "/db/" + name);
-        OwlToGraph_bill mainSchema = new OwlToGraph_bill();
+        OwlToGraph mainSchema = new OwlToGraph();
         mainSchema.createNewDB(graphFile);
-        mainSchema.createDBfromOnt(schemaFile, OwlToGraph_bill.NodeTypes.SCHEMA_ONTOLOGY, false);
+        mainSchema.createDBfromOnt(schemaFile, OwlToGraph.NodeTypes.SCHEMA_ONTOLOGY, false);
         mainSchema.labelSchemaOnt();
 
         // create Modifier ontology DB
@@ -52,14 +50,14 @@ public class CreateKADatabase {
         name = modifierFile.getName();
         name = name.substring(0, name.lastIndexOf("."));
         graphFile = new File(modifierFile.getParent() + "/db/" + name);
-        OwlToGraph_bill mainModifier = new OwlToGraph_bill();
+        OwlToGraph mainModifier = new OwlToGraph();
         mainModifier.createNewDB(graphFile);
-        mainModifier.createDBfromOnt(modifierFile, OwlToGraph_bill.NodeTypes.MODIFIER_ONTOLOGY, true);
+        mainModifier.createDBfromOnt(modifierFile, OwlToGraph.NodeTypes.MODIFIER_ONTOLOGY, true);
         mainModifier.labelModifierOnt();
 
         // create root db
         File graphFileRoot = new File(rootDBName);
-        OwlToGraph_bill mainRoot = new OwlToGraph_bill();
+        OwlToGraph mainRoot = new OwlToGraph();
         mainRoot.createNewDB(graphFileRoot);
 
         // add ontology databases to root DB
