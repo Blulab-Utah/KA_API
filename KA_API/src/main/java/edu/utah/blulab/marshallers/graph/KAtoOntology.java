@@ -101,6 +101,7 @@ public class KAtoOntology implements AutoCloseable
         managerOWL.applyChange(new AddImport(ontology, importDeclaration3));
 
         // create a list of all classes and create an owl node for each
+        Map<String, OWLEquivalentClassesAxiom> variableAxiomMap = new HashMap<>();
         int count = 0;
         for (Triple triple:tripleList){
 
@@ -242,8 +243,32 @@ public class KAtoOntology implements AutoCloseable
                     OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
                     OWLClassExpression hasSome = factoryOWL.getOWLObjectSomeValuesFrom(objProp, nodeClass1);
                     //OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
-                    OWLEquivalentClassesAxiom eqAx = factoryOWL.getOWLEquivalentClassesAxiom(nodeClass2, hasSome);
-                    managerOWL.applyChange(new AddAxiom(ontology, eqAx));
+
+                    String key = node2.get("uri").asString() + rel.get("uri").asString();
+                    if (variableAxiomMap.containsKey(key)){ // if an axiom with the same node uri and relationship exists, combine the two axioms with the ObjectUnionOf property
+                        //Set<OWLClassExpression> expSet = new HashSet<>();
+                        //expSet.add(hasSome);
+                        for (OWLClassExpression owlCla : variableAxiomMap.get(key).getClassExpressions()){
+                            if (owlCla.getClassExpressionType().toString().equals("ObjectSomeValuesFrom")){
+                                Set<OWLClassExpression> expSetNew = new HashSet<>();
+                                expSetNew.add(owlCla);
+                                expSetNew.add(hasSome);
+                                OWLObjectUnionOf objUnion = factoryOWL.getOWLObjectUnionOf(expSetNew);
+                                OWLEquivalentClassesAxiom eqAx2 = factoryOWL.getOWLEquivalentClassesAxiom(nodeClass2, objUnion);
+                                variableAxiomMap.put(key, eqAx2);
+                            } else if (owlCla.getClassExpressionType().toString().equals("ObjectUnionOf")){
+                                int xx = 1;
+                            }
+                            //expSet.add(owlCla);
+                        }
+
+
+                    } else {
+                        OWLEquivalentClassesAxiom eqAx = factoryOWL.getOWLEquivalentClassesAxiom(nodeClass2, hasSome);
+                        variableAxiomMap.put(key, eqAx);
+                    }
+                    //managerOWL.applyChange(new AddAxiom(ontology, eqAx));
+                    int xxx =1;
                 } else {
                     //OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
                     OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
@@ -257,6 +282,10 @@ public class KAtoOntology implements AutoCloseable
 //        String outputFileName = "C:\\Users\\Bill\\Desktop\\test.owl";
 //        FileDocumentTarget fileOut = new FileDocumentTarget(new File(outputFileName));
 //        managerOWL.saveOntology(ontology, new OWLXMLOntologyFormat(), fileOut);
+
+        // todo: write the axiom hashmap to the ontology
+//        // combine multiple of the same variable axioms into on axoim
+//        combineVariableAxioms(variableAxiomMap);
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         managerOWL.saveOntology(ontology, new OWLXMLOntologyFormat(), stream);
@@ -403,6 +432,18 @@ public class KAtoOntology implements AutoCloseable
         //session.close();
         //return tripleList;
         //driverNeo4j.close();
+    }
+
+    private void combineVariableAxioms(Map<String, OWLEquivalentClassesAxiom> variableAxiomMap){
+        for (OWLEquivalentClassesAxiom axiom: variableAxiomMap.values()){
+            for (OWLClassExpression exp : axiom.getClassExpressions()){
+                exp.toString();
+                // todo: delete or fill in the method
+            }
+        }
+//        variableAxiomList.get(0).getNamedClasses();
+//        variableAxiomList.get(0).getClassExpressions();
+
     }
 
     private boolean isImportURI(String uri){
