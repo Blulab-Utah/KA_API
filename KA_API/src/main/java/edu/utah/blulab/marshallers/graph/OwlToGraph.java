@@ -281,34 +281,18 @@ public class OwlToGraph {
                         }
 
                         Map<OWLObjectPropertyExpression, Set<OWLIndividual>> objProps = indiv.getObjectPropertyValues(ontology);
-                        //StringBuilder sb = new StringBuilder();
                         List<String> valList = new ArrayList<>();
                         for (OWLObjectPropertyExpression key : objProps.keySet()) {
                             Set<OWLIndividual> values = objProps.get(key);
                             for (OWLIndividual val : values) {
-                                //sb.append(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI() + "|");
                                 valList.add(((OWLObjectPropertyImpl) key).getIRI() + "::" + ((OWLNamedIndividualImpl) val).getIRI());
                             }
                         }
                         indNode.setProperty("objectProperties", String.join("|", valList));
-
-
                         indNode.createRelationshipTo(newNode, RelationshipType.withName("hasIndividual"));
                     }
                 }
             }
-
-//            while ( result.hasNext() )
-//            {
-//                Map<String, Object> row = result.next();
-//                for ( String key : result.columns() )
-//                {
-//                    System.out.printf( "%s = %s%n", key, row.get( key ) );
-//                    String nodeStr = row.get( key ).toString();
-//                    int xx = 1;
-//                }
-//            }
-            //makeCopy(graphDB);
 
             tx.success();
         }finally {

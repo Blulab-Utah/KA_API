@@ -5,8 +5,6 @@ import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.GraphDatabase;
 import org.neo4j.driver.v1.Session;
 import org.neo4j.driver.v1.StatementResult;
-import org.neo4j.driver.v1.Transaction;
-import org.neo4j.driver.v1.TransactionWork;
 import org.neo4j.driver.v1.Record;
 import org.neo4j.driver.v1.Value;
 import org.neo4j.driver.v1.types.Node;
@@ -14,7 +12,6 @@ import org.neo4j.driver.v1.types.Relationship;
 import org.semanticweb.owlapi.io.OWLXMLOntologyFormat;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.io.FileDocumentTarget;
 import uk.ac.manchester.cs.owl.owlapi.*;
 
 import java.util.*;
@@ -55,10 +52,10 @@ public class KAtoOntology implements AutoCloseable
         String neo4jURL = "bolt://localhost:7687";
         String username =  "neo4j";
         String password = "chuck6";
-        String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/smoking.owl";
+        //String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/smoking.owl";
         //String ontURI = OntologyConstants.SCHEMA_BASE_URI;
         //String ontURI = OntologyConstants.MODIFIER_BASE_URI;
-        //String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/heartDiseaseInDiabetics.owl";
+        String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/heartDiseaseInDiabetics.owl";
 
 
         String outputFileName = "C:\\Users\\Bill\\Desktop\\test.owl";
@@ -186,11 +183,10 @@ public class KAtoOntology implements AutoCloseable
 //                }
 
             // add relationships between nodes
-            if (rel.type().equals("IS_A")) {
+            if (rel.type().equals("IS_A")) { // for IS_A relationships
                 OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, nodeClass1);
                 managerOWL.applyChange(new AddAxiom(ontology, axiom));
-            } else if (rel.type().equals("hasIndividual")){
-                // todo: process object properties of individuals
+            } else if (rel.type().equals("hasIndividual")){ // for individuals
                 OWLIndividual indiv = factoryOWL.getOWLNamedIndividual(IRI.create(node2.get("uri").asString()));
                 OWLClassAssertionAxiom classAssertion = factoryOWL.getOWLClassAssertionAxiom(nodeClass1, indiv);
                 for (String property : node2.keys()){
@@ -204,11 +200,8 @@ public class KAtoOntology implements AutoCloseable
                             String[] keyVal = val.split("::");
                             String relIRI = keyVal[0];
                             String indiv2IRI = keyVal[1];
-                            if (count >= 160) {
-                                int ii = 1;
-                            }
-                                addObjectPropertyToIndividual(indiv2IRI, relIRI, indiv);
-                                count++;
+                            addObjectPropertyToIndividual(indiv2IRI, relIRI, indiv);
+                            //count++;
                         } else { // for all other properties, add to the original individual
                             addAnnotationToIndividual(property, val, indiv);
                         }
@@ -216,14 +209,13 @@ public class KAtoOntology implements AutoCloseable
                 }
                 managerOWL.addAxiom(ontology, classAssertion);
             } else {
-                if (node1.hasLabel("DATATYPE")){
+                if (node1.hasLabel("DATATYPE")){ // for DATATYPE nodes
                     OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                    //OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
                     OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(rel.get("uri").asString()));
                     OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, nodeData1);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                } else if (node1.hasLabel("DATA_ONE_OF")){
+                } else if (node1.hasLabel("DATA_ONE_OF")){ // for DATA_ONE_OF nodes
                     OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
                     String[] dataOneOfStrArr = node1.get("name").asString().split("\\|");
                     Set<OWLLiteral> literalSet = new HashSet<>();
@@ -232,13 +224,11 @@ public class KAtoOntology implements AutoCloseable
                         literalSet.add(lit);
                     }
                     OWLDataOneOf dataOneOf = factoryOWL.getOWLDataOneOf(literalSet);
-                    //OWLDatatype nodeData1 = factoryOWL.getOWLDatatype(IRI.create(node1.get("uri").asString()));
-                    //OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(ontologyIRI.toString() + "#" + rel.type()));
                     OWLDataProperty dataProp = factoryOWL.getOWLDataProperty(IRI.create(rel.get("uri").asString()));
                     OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                } else if (node2.hasLabel("VARIABLE") & node2.get("uri").asString().contains(ontURI)) { // for the variable nodes the hasSome properties as Equivalent, not SubClass of
+                } else if (node2.hasLabel("VARIABLE") & node2.get("uri").asString().contains(ontURI)) { // for the variable nodes, the hasSome properties as Equivalent, not SubClass of
                     OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
                     OWLClassExpression hasSome;
                     String key = node2.get("uri").asString() + rel.get("uri").asString();
@@ -528,52 +518,6 @@ public class KAtoOntology implements AutoCloseable
         }
     }
 
-    public void getParentChildTriple_old(Node parentNode, Session session, List<Triple> tripleList) throws Exception{
-        int x = 11;
-        //Session session = driverNeo4j.session();
-
-        String parentID = (String)parentNode.asMap().get("id");
-        System.out.println("parentNode id: " + parentNode.id());
-        // TODO: for each relationship direction, run a separate query and add the direction info to the triple
-        StatementResult result =
-                session.run( "MATCH (n)-[rel*1]-(child) WHERE ID(n)=" + parentNode.id() + " RETURN n, rel, child");
-
-        //List<Triple> tripleList = new ArrayList<>();
-        int count = 0;
-        while (result.hasNext()) {
-            Record record = result.next();
-            //Value nv = record.get("child");
-            Node childNode = record.get("child").asNode();
-            Node parentNode2 = record.get("n").asNode(); // redundant copy of parent node
-            //System.out.println(record.get("child").get("name").asString() );
-
-            String parentName = (String)parentNode2.asMap().get("name"); //((InternalNode) parentNode
-            String childName = (String)childNode.asMap().get("name");
-            for (int i = 0; i < record.get("rel").size(); i++) {
-                Relationship rel = record.get("rel").get(i).asRelationship();
-                Triple trip = new Triple();
-                trip.setNode1(parentNode2);
-                trip.setNode2(childNode);
-                trip.setRel(rel);
-                //tripleList.add(trip);
-                System.out.println(parentName + " -- " + rel.type() + " -- " + childName);
-                //System.out.println(rel.startNodeId() + " -- " + rel.type() + " -- " + rel.endNodeId());
-                count += 1;
-                System.out.println(trip.toString());
-
-                if(compareTriples(trip, tripleList)) { continue; } // if the triple is not unique, skip it
-
-                tripleList.add(trip);
-                getParentChildTriple_old(childNode, session, tripleList);
-            }
-        }
-        System.out.println("Total relationships found: " + count);
-
-        //session.close();
-        //return tripleList;
-        //driverNeo4j.close();
-    }
-
     private boolean compareTriples(Triple trip1, List<Triple> tripList){
         boolean match = false;
 
@@ -685,7 +629,6 @@ public class KAtoOntology implements AutoCloseable
         session.close();
         //driverNeo4j.close();
     }
-
 
     public int getThingNode() throws Exception
     {

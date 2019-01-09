@@ -1,9 +1,7 @@
-package edu.utah.blulab.marshallers.graph;
+package edu.utah.blulab.marshallers.old;
 
 import org.neo4j.helpers.collection.Iterators;
 
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
 
 import static org.neo4j.helpers.collection.MapUtil.map;
