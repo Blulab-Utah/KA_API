@@ -1,5 +1,6 @@
 package edu.utah.blulab.marshallers.graph;
 
+import org.neo4j.driver.internal.InternalRelationship;
 import org.neo4j.driver.v1.AuthTokens;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.GraphDatabase;
@@ -52,10 +53,12 @@ public class KAtoOntology implements AutoCloseable
         String neo4jURL = "bolt://localhost:7687";
         String username =  "neo4j";
         String password = "chuck6";
+        String ontURI =  "http://blulab.chpc.utah.edu/ontologies/schema/asantros/Working.owl";
+        //String ontURI =  "http://blulab.chpc.utah.edu/ontologies/schema/bscuba/smoking_demo.owl";
         //String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/smoking.owl";
         //String ontURI = OntologyConstants.SCHEMA_BASE_URI;
-        //String ontURI = OntologyConstants.MODIFIER_BASE_URI;
-        String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/heartDiseaseInDiabetics.owl";
+        //String ontURI = OntologyConstants.MODIFIER_BASE_URI;.
+        //String ontURI = "http://blulab.chpc.utah.edu/ontologies/examples/heartDiseaseInDiabetics.owl";
 
 
         String outputFileName = "C:\\Users\\Bill\\Desktop\\test.owl";
@@ -103,6 +106,8 @@ public class KAtoOntology implements AutoCloseable
         for (Triple triple:tripleList){
 
             Relationship rel = triple.getRel();
+            addURIIfMissing(rel); // todo: build this method out to add a uri for hasAnchor and other relationships, if the uri is missing
+
             Triple.Direction dir = triple.getDirection();
             Node node1;
             Node node2;
@@ -118,7 +123,6 @@ public class KAtoOntology implements AutoCloseable
             }
 
             // skip nodes from one of the imported ontologies
-            // todo: figure out how to write only the classes that are not included in the import declarations
 //            if (node1.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI) & node2.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI)){ // if both nodes are from imported ontologies
 //                continue;
 //            } else if (node1.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI) | node2.get("uri").asString().contains(OntologyConstants.SCHEMA_BASE_URI)){ // if only one of the nodes is from imported ontologies
@@ -143,6 +147,11 @@ public class KAtoOntology implements AutoCloseable
                 if (property.equals("name") | property.equals("uri")){
                     continue;
                 }
+
+                if (property.equals("datatype")){
+
+                }
+
                 String propertyValue = node1.get(property).asString();
                 // parse multiple values from string ('|' delimited)
                 for (String val : propertyValue.split("\\|")) {
@@ -164,6 +173,7 @@ public class KAtoOntology implements AutoCloseable
                 String xxx = "HERE";
             }
 
+            // todo: add this synonym code handling back in
             // handle synonyms, misspellings, regex and abbreviations if they are separate nodes
 //                if (rel.hasType("hasSynonym")) {
 //                    addAnnotationToClass("synonym", node1.get("name").asString(), nodeClass2);
@@ -183,6 +193,8 @@ public class KAtoOntology implements AutoCloseable
 //                }
 
             // add relationships between nodes
+
+            addURIIfMissing(triple); // todo: build this method out
             if (rel.type().equals("IS_A")) { // for IS_A relationships
                 OWLAxiom axiom = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, nodeClass1);
                 managerOWL.applyChange(new AddAxiom(ontology, axiom));
@@ -228,7 +240,7 @@ public class KAtoOntology implements AutoCloseable
                     OWLDataSomeValuesFrom hasSome = factoryOWL.getOWLDataSomeValuesFrom(dataProp, dataOneOf);
                     OWLSubClassOfAxiom subAx = factoryOWL.getOWLSubClassOfAxiom(nodeClass2, hasSome);
                     managerOWL.applyChange(new AddAxiom(ontology, subAx));
-                } else if (node2.hasLabel("VARIABLE") & node2.get("uri").asString().contains(ontURI)) { // for the variable nodes, the hasSome properties as Equivalent, not SubClass of
+                } else if (node2.hasLabel("VARIABLE") & node2.get("uri").asString().contains(ontURI)) { // for the variable nodes, the hasSome properties is as Equivalent, not SubClass of
                     OWLObjectProperty objProp = factoryOWL.getOWLObjectProperty(IRI.create(rel.get("uri").asString()));
                     OWLClassExpression hasSome;
                     String key = node2.get("uri").asString() + rel.get("uri").asString();
@@ -267,7 +279,7 @@ public class KAtoOntology implements AutoCloseable
         Session session = driverNeo4j.session();
 
         StatementResult result =
-                session.run( "MATCH (n {name:'" + ontURI  + "'})<-[rel*1]-(child) RETURN n, rel, child");
+                session.run( "MATCH (n {uri:'" + ontURI  + "'})<-[rel*1]-(child) RETURN n, rel, child");
 
         List<Triple> tripleList = new ArrayList<>();
         int count = 0;
@@ -435,6 +447,24 @@ public class KAtoOntology implements AutoCloseable
 //        }
 //        variableAxiomList.get(0).getNamedClasses();
 //        variableAxiomList.get(0).getClassExpressions();
+
+    }
+
+    private void addURIIfMissing(Triple triple){
+        HashMap<String, String> uriMap = new HashMap<>();
+        uriMap.put("hasAnchor", OntologyConstants.SCHEMA_BASE_URI + "#hasAnchor");
+        if (uriMap.containsKey(triple.getRel().type())){
+            Object test = "asdfa";
+//            ((InternalRelationship) triple.getRel()).properties.size()
+
+//            triple.getRel().properties.put("uri", uriMap.get(triple.getRel().type()));
+//            triple.getRel().setProperty();
+            int xx = 1;
+        }
+    }
+
+    private void axiomStrToExpression(){
+        // takes a text string of a owl expressing and created an owl axiom
 
     }
 

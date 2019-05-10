@@ -27,7 +27,7 @@ public class OwlToGraph {
 
         // todo:comment this back out
         //File ontFile = new File(args[0]);
-        File ontFile = new File("C:\\Users\\Bill\\Documents\\2018\\Chapman Lab\\Data\\ontology\\smoking_sub.owl");
+        File ontFile = new File("C:\\Users\\Bill\\Documents\\2018\\Chapman Lab\\Data\\ontology\\smoking.owl");
         //File ontFile = new File("C:\\Users\\Bill\\Desktop\\smoking_sub.owl");
 
         String name = ontFile.getName();
@@ -174,7 +174,15 @@ public class OwlToGraph {
 //                Set<OWLDatatype> datatypes = cls.getDatatypesInSignature();
 
                 //get all axioms on each class and create relationships for each
+
+                Set<OWLClassExpression> classExpressionsSubCls = cls.getSubClasses(manager.getOntologies());
+
                 Set<OWLClassExpression> classExpressions = cls.getEquivalentClasses(manager.getOntologies());
+
+                if (classExpressions.size() > 0){
+                    int xxxx = 1;
+                }
+
                 classExpressions.addAll(cls.getSuperClasses(manager.getOntologies()));
                 for (OWLClassExpression exp : classExpressions) {
                     if (exp.getClassExpressionType().equals(ClassExpressionType.OBJECT_SOME_VALUES_FROM)) {
@@ -194,6 +202,7 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     objPropertyExpression.asOWLObjectProperty().getIRI().toString());
+                            //propRelation.setProperty("owlRelationshipType", "equivalent");
                         } else if (fillerClass.getClassExpressionType().equals(ClassExpressionType.OBJECT_UNION_OF)){ // if there are a list of classes for a hasSome expression
                             for (OWLClass clsFromList : fillerClass.getClassesInSignature()){
                                 String fillerName = clsFromList.asOWLClass().getIRI().getShortForm();
@@ -202,6 +211,7 @@ public class OwlToGraph {
                                         RelationshipType.withName(relation));
                                 propRelation.setProperty("uri",
                                         objPropertyExpression.asOWLObjectProperty().getIRI().toString());
+                                //propRelation.setProperty("owlRelationshipType", "equivalent");
                             }
                         }
                     } else if (exp.getClassExpressionType().equals(ClassExpressionType.DATA_SOME_VALUES_FROM)) {
@@ -220,7 +230,8 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
-
+                            ///propRelation.setProperty("owlRelationshipType", "equivalent");
+                            //newNode.setProperty("DataSomeValuesFrom", "test"); // add the data type axiom as a string (below, add it as a node)
                         } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATA_ONE_OF)) { // get the data_one_of values such as "true"
                             StringBuilder sb = new StringBuilder();
                             String prefix = "";
@@ -237,6 +248,8 @@ public class OwlToGraph {
                                     RelationshipType.withName(relation));
                             propRelation.setProperty("uri",
                                     dataPropertyExpression.asOWLDataProperty().getIRI().toString());
+                            //propRelation.setProperty("owlRelationshipType", "equivalent");
+                            //newNode.setProperty("DataSomeValuesFrom", "test"); // add the data type axiom as a string (below, add it as a node)
 
                         } else if (fillerClass.getDataRangeType().equals(DataRangeType.DATATYPE_RESTRICTION)) { // add datatype restriction as properties of the new node
                             StringBuilder sb = new StringBuilder();
